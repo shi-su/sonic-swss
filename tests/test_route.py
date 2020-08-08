@@ -590,11 +590,42 @@ class TestRoute(TestRouteBase):
 
 class TestRoutePerf(TestRouteBase):
     """ Performance tests for route """
+    def enableSyncMode(self, dvs):
+        print("Enable: configuring files")
+        dvs.runcmd("cp /usr/bin/orchagent.sh /usr/bin/orchagent.sh.backup")
+        dvs.runcmd("cp /usr/bin/syncd_init_common.sh /usr/bin/syncd_init_common.sh.backup")
+        dvs.runcmd("sed -ri 's/-b 8192 /-b 8192 -s /' /usr/bin/orchagent.sh")
+        dvs.runcmd("sed -ri 's/ -u/ -u -s/' /usr/bin/syncd_init_common.sh")
+        print("Enable: restarting dvs")
+        dvs.restart()
+        # dvs.runcmd("supervisorctl restart syncd")
+        # dvs.stop_swss()
+        # dvs.start_swss()
+        print("Enable: sleep 10 seconds")
+        time.sleep(10)
+
+    def disableSyncMode(self, dvs):
+        print("Disable: configuring files")
+        dvs.runcmd("rm /usr/bin/syncd_init_common.sh")
+        dvs.runcmd("rm /usr/bin/orchagent.sh")
+        dvs.runcmd("mv /usr/bin/syncd_init_common.sh.backup /usr/bin/syncd_init_common.sh")
+        dvs.runcmd("mv /usr/bin/orchagent.sh.backup /usr/bin/orchagent.sh")
+        print("Disable: restarting dvs")
+        dvs.restart()
+        # dvs.runcmd("supervisorctl restart syncd")
+        # dvs.stop_swss()
+        # dvs.start_swss()
+        print("Disable: sleep 10 seconds")
+        time.sleep(10)
+
     def test_PerfAddRemoveRoute(self, dvs, testlog):
+        # self.enableSyncMode(dvs)
+
         self.setup_db(dvs)
         self.clear_srv_config(dvs)
         numRoutes = 10000   # number of routes to add/remove
         timeout = 30        # timeout if routes are not successfully added/removed in 30 seconds
+        numRounds = 10      # number of rounds in performance test
 
         # generate addresses of routes
         addrs = []
@@ -628,40 +659,48 @@ class TestRoutePerf(TestRouteBase):
         # get number of routes before adding new routes
         startNumRoutes = len(self.adb.get_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY"))
 
-        # add route entries
-        timeStart = time.time()
-        for i in range(numRoutes):
-            self.create_route_entry(addrs[i], fieldValues[i % 2])
+        addTime = 0.0
+        removeTimes = 0.0
+        for iTest in range(numRounds):
+            # add route entries
+            timeStart = time.time()
+            for i in range(numRoutes):
+                self.create_route_entry(addrs[i], fieldValues[i % 2])
 
-        # wait until all routes are added into ASIC database
-        pollingCfg = PollingConfig(polling_interval=0.01, timeout=timeout, strict=True) # extend timeout since routes may take longer than 5 seconds (default timeout) to load
-        self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes + numRoutes, pollingCfg)
-        print("Time to add %d routes is %.2f seconds. " % (numRoutes, time.time() - timeStart))
+            # wait until all routes are added into ASIC database
+            pollingCfg = PollingConfig(polling_interval=0.01, timeout=timeout, strict=True) # extend timeout since routes may take longer than 5 seconds (default timeout) to load
+            self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes + numRoutes, pollingCfg)
+            print("Time to add %d routes is %.2f seconds. " % (numRoutes, time.time() - timeStart))
+            addTime += time.time() - timeStart
 
-        # confirm all routes are added
-        asicAddrs = set()
-        for key in self.adb.get_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY"):
-            route = json.loads(key)
-            asicAddrs.add(route["dest"])
-        for addr in addrs:
-            assert addr in asicAddrs
+            # confirm all routes are added
+            asicAddrs = set()
+            for key in self.adb.get_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY"):
+                route = json.loads(key)
+                asicAddrs.add(route["dest"])
+            for addr in addrs:
+                assert addr in asicAddrs
 
-        #remove route entries
-        timeStart = time.time()
-        for i in range(numRoutes):
-            self.remove_route_entry(addrs[i])
+            #remove route entries
+            timeStart = time.time()
+            for i in range(numRoutes):
+                self.remove_route_entry(addrs[i])
 
-        # wait until all routes are removed from ASIC database
-        self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes, pollingCfg)
-        print("Time to remove %d routes is %.2f seconds. " % (numRoutes, time.time() - timeStart))
+            # wait until all routes are removed from ASIC database
+            self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes, pollingCfg)
+            print("Time to remove %d routes is %.2f seconds. " % (numRoutes, time.time() - timeStart))
+            removeTimes += time.time() - timeStart
 
-        # confirm all routes are removed
-        asicAddrs = set()
-        for key in self.adb.get_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY"):
-            route = json.loads(key)
-            asicAddrs.add(route["dest"])
-        for addr in addrs:
-            assert not addr in asicAddrs
+            # confirm all routes are removed
+            asicAddrs = set()
+            for key in self.adb.get_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY"):
+                route = json.loads(key)
+                asicAddrs.add(route["dest"])
+            for addr in addrs:
+                assert not addr in asicAddrs
+
+        print("average time to add 10000 routes is %.2f" % (addTime / numRounds))
+        print("average time to remove 10000 routes is %.2f" % (removeTimes / numRounds))
 
         # remove ip address
         self.remove_ip_address("Ethernet0", "10.0.0.0/31")
@@ -680,3 +719,8 @@ class TestRoutePerf(TestRouteBase):
 
         dvs.servers[1].runcmd("ip route del default dev eth0")
         dvs.servers[1].runcmd("ip address del 10.0.0.3/31 dev eth0")
+
+        # self.disableSyncMode(dvs)
+
+    # def test_placeholder(self, dvs, testlog):
+    #     time.sleep(1000)
