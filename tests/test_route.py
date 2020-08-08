@@ -619,7 +619,7 @@ class TestRoutePerf(TestRouteBase):
         time.sleep(10)
 
     def test_PerfAddRemoveRoute(self, dvs, testlog):
-        # self.enableSyncMode(dvs)
+        self.enableSyncMode(dvs)
 
         self.setup_db(dvs)
         self.clear_srv_config(dvs)
@@ -720,7 +720,7 @@ class TestRoutePerf(TestRouteBase):
         dvs.servers[1].runcmd("ip route del default dev eth0")
         dvs.servers[1].runcmd("ip address del 10.0.0.3/31 dev eth0")
 
-        # self.disableSyncMode(dvs)
+        self.disableSyncMode(dvs)
 
     # def test_placeholder(self, dvs, testlog):
     #     time.sleep(1000)
