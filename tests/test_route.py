@@ -5,8 +5,6 @@ import json
 import pytest
 
 from swsscommon import swsscommon
-from dvslib.dvs_common import PollingConfig
-
 
 class TestRouteBase(object):
     def setup_db(self, dvs):
@@ -624,7 +622,6 @@ class TestRoutePerf(TestRouteBase):
         self.setup_db(dvs)
         self.clear_srv_config(dvs)
         numRoutes = 10000   # number of routes to add/remove
-        timeout = 30        # timeout if routes are not successfully added/removed in 30 seconds
         numRounds = 10      # number of rounds in performance test
 
         # generate addresses of routes
@@ -668,8 +665,7 @@ class TestRoutePerf(TestRouteBase):
                 self.create_route_entry(addrs[i], fieldValues[i % 2])
 
             # wait until all routes are added into ASIC database
-            pollingCfg = PollingConfig(polling_interval=0.01, timeout=timeout, strict=True) # extend timeout since routes may take longer than 5 seconds (default timeout) to load
-            self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes + numRoutes, pollingCfg)
+            self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes + numRoutes)
             print("Time to add %d routes is %.2f seconds. " % (numRoutes, time.time() - timeStart))
             addTime += time.time() - timeStart
 
@@ -687,7 +683,7 @@ class TestRoutePerf(TestRouteBase):
                 self.remove_route_entry(addrs[i])
 
             # wait until all routes are removed from ASIC database
-            self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes, pollingCfg)
+            self.adb.wait_for_n_keys("ASIC_STATE:SAI_OBJECT_TYPE_ROUTE_ENTRY", startNumRoutes)
             print("Time to remove %d routes is %.2f seconds. " % (numRoutes, time.time() - timeStart))
             removeTimes += time.time() - timeStart
 
