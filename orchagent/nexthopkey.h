@@ -69,6 +69,7 @@ struct NextHopKey
         vni = static_cast<uint32_t>(std::stoul(keys[2]));
         mac_address = keys[3];
     }
+    NextHopKey(const IpAddress &ip, const MacAddress &mac, const uint32_t &vni, bool overlay_nh) : ip_address(ip), alias(""), vni(vni), mac_address(mac){}
 
     const std::string to_string() const
     {
