@@ -77,6 +77,10 @@ public:
     bool invalidnexthopinNextHopGroup(const NextHopKey&);
 
     void notifyNextHopChangeObservers(sai_object_id_t, const IpPrefix&, const NextHopGroupKey&, bool);
+
+    void increaseNextHopGroupCount();
+    void decreaseNextHopGroupCount();
+    bool checkNextHopGroupCount();
 private:
     SwitchOrch *m_switchOrch;
     NeighOrch *m_neighOrch;

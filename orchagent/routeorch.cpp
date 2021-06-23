@@ -779,6 +779,7 @@ bool RouteOrch::addNextHopGroup(const NextHopGroupKey &nexthops)
     }
 
     m_nextHopGroupCount ++;
+    SWSS_LOG_NOTICE("Increased NextHopGroupCount to %d", m_nextHopGroupCount);
     SWSS_LOG_NOTICE("Create next hop group %s", nexthops.to_string().c_str());
 
     gCrmOrch->incCrmResUsedCounter(CrmResourceType::CRM_NEXTHOP_GROUP);
@@ -890,6 +891,7 @@ bool RouteOrch::removeNextHopGroup(const NextHopGroupKey &nexthops)
     }
 
     m_nextHopGroupCount --;
+    SWSS_LOG_NOTICE("Decreased NextHopGroupCount to %d", m_nextHopGroupCount);
     gCrmOrch->decCrmResUsedCounter(CrmResourceType::CRM_NEXTHOP_GROUP);
 
     set<NextHopKey> next_hop_set = nexthops.getNextHops();
@@ -1221,4 +1223,19 @@ bool RouteOrch::removeRoute(sai_object_id_t vrf_id, const IpPrefix &ipPrefix)
     }
 
     return true;
+}
+
+void RouteOrch::increaseNextHopGroupCount()
+{
+    m_nextHopGroupCount ++;
+}
+
+void RouteOrch::decreaseNextHopGroupCount()
+{
+    m_nextHopGroupCount --;
+}
+
+bool RouteOrch::checkNextHopGroupCount()
+{
+    return m_nextHopGroupCount < m_maxNextHopGroupCount;
 }

@@ -19,6 +19,7 @@
 #include "swssnet.h"
 #include "neighorch.h"
 #include "crmorch.h"
+#include "routeorch.h"
 
 extern sai_virtual_router_api_t* sai_virtual_router_api;
 extern sai_route_api_t* sai_route_api;
@@ -35,6 +36,7 @@ extern PortsOrch *gPortsOrch;
 extern IntfsOrch *gIntfsOrch;
 extern NeighOrch *gNeighOrch;
 extern CrmOrch *gCrmOrch;
+extern RouteOrch *gRouteOrch;
 extern MacAddress gVxlanMacAddress;
 
 /*
@@ -642,7 +644,11 @@ bool VNetRouteOrch::addNextHopGroup(const NextHopGroupKey &nexthops, VNetVrfObje
 
     assert(!hasNextHopGroup(nexthops));
 
-    // TODO: check if the total number of nexthop group is exceed the limit
+    if (!gRouteOrch->checkNextHopGroupCount())
+    {
+        SWSS_LOG_ERROR("Reached maximum number of next hop groups. Failed to create new next hop group.");
+        return false;
+    }
 
     vector<sai_object_id_t> next_hop_ids;
     set<NextHopKey> next_hop_set = nexthops.getNextHops();
@@ -675,6 +681,7 @@ bool VNetRouteOrch::addNextHopGroup(const NextHopGroupKey &nexthops, VNetVrfObje
         return false;
     }
 
+    gRouteOrch->increaseNextHopGroupCount();
     gCrmOrch->incCrmResUsedCounter(CrmResourceType::CRM_NEXTHOP_GROUP);
     SWSS_LOG_NOTICE("Create next hop group %s", nexthops.to_string().c_str());
 
@@ -765,6 +772,7 @@ bool VNetRouteOrch::removeNextHopGroup(const NextHopGroupKey &nexthops)
         return false;
     }
 
+    gRouteOrch->decreaseNextHopGroupCount();
     gCrmOrch->decCrmResUsedCounter(CrmResourceType::CRM_NEXTHOP_GROUP);
 
     syncd_nexthop_groups_.erase(nexthops);
